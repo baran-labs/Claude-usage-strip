@@ -1,0 +1,15 @@
+{
+  "name": "claude-usage-strip",
+  "owner": { "name": "Baran" },
+  "metadata": {
+    "description": "A visual usage strip and panel for Claude Code: context, plan limits, tokens and API-price cost. Turkish and English."
+  },
+  "plugins": [
+    {
+      "name": "usage-strip",
+      "source": "./",
+      "description": "Context fill, plan limits, tokens and API-price cost as visual cards above the prompt, plus a detailed usage panel.",
+      "version": "1.0.0"
+    }
+  ]
+}

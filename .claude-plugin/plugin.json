@@ -1,0 +1,18 @@
+{
+  "name": "usage-strip",
+  "version": "1.0.0",
+  "description": "Context fill, plan limits, tokens and API-price cost as visual cards above the prompt, plus a detailed usage panel. Turkish and English.",
+  "author": { "name": "Baran" },
+  "license": "MIT",
+  "keywords": ["usage", "context", "limits", "tokens", "cost", "mod", "turkish"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "language": {
+      "type": "string",
+      "title": "Language / Dil",
+      "description": "auto follows your system language (Turkish if it starts with tr, otherwise English). / auto: sistem dilin Türkçe ise Türkçe, değilse İngilizce.",
+      "default": "auto",
+      "options": ["auto", "tr", "en"]
+    }
+  }
+}
