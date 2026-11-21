@@ -76,8 +76,8 @@ const TABS: StripTab[] = ['overview', 'cost', 'context', 'background', 'outputs'
 // ---------- Sizes and colours ----------
 // SVGs use saturated colours on a translucent track so they read on light and
 // dark themes; all other text uses the app's own theme colours.
-const RING = 54
-const RING_STROKE = 6
+const RING = 58
+const RING_STROKE = 7
 const STACK_W = 170
 const STACK_H = 8
 const SPARK_W = 130
@@ -86,7 +86,8 @@ const PANEL_W = 600
 const FOLDER_MAX = 24
 const TRACK = 'rgba(127,127,127,0.22)'
 const MUTED = '#8b949e'
-const FONT = 'system-ui,-apple-system,Segoe UI,Roboto,sans-serif'
+// A full, rounded face first where it is installed, then the system's.
+const FONT = 'Inter,SF Pro Display,-apple-system,system-ui,Segoe UI,Roboto,Ubuntu,Cantarell,sans-serif'
 
 const COLOR = {
   ok: '#3fb950',
@@ -170,10 +171,11 @@ export function toolLabel(name: string): string {
   return match?.[1] ?? name
 }
 
-// "claude-opus-5-5[1m]" -> "Opus 5.5 (1M context)"
-function modelName(id: string, m: Messages): string {
+// "claude-opus-5-5[1m]" -> "Opus 5.5 (1M context)"; "claude-sonnet-4-20250514" -> "Sonnet 4"
+export function modelName(id: string, m: Messages): string {
   const long = /\[1m\]/i.test(id)
-  const match = /claude-([a-z]+)-(\d+)(?:-(\d+))?/i.exec(id)
+  // The minor version is one or two digits: a dated id's date is not one.
+  const match = /claude-([a-z]+)-(\d+)(?:-(\d{1,2})(?!\d))?/i.exec(id)
   if (!match || !match[1] || !match[2]) return id
   const name = match[1].charAt(0).toUpperCase() + match[1].slice(1) + ' ' + match[2] + (match[3] ? '.' + match[3] : '')
   return name + (long ? m.ctx1m : '')
@@ -187,9 +189,10 @@ function svg(w: number, ht: number, body: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${ht}" viewBox="0 0 ${w} ${ht}">${body}</svg>`
 }
 
+// Text is drawn full: medium unless the Text sets its own weight.
 // The terminal takes no text size or weight: drop them there, keep bold.
 function textFor(surface: string, Raw: ElementConstructor<TextProps>): ElementConstructor<TextProps> {
-  if (surface !== 'terminal') return Raw
+  if (surface !== 'terminal') return ({ weight, ...rest }) => Raw({ ...rest, weight: weight ?? (rest.bold ? 'semibold' : 'medium') })
   return ({ size: _size, weight, tabular: _tabular, ...rest }) =>
     Raw({ ...rest, bold: rest.bold || weight === 'bold' || weight === 'semibold' || undefined })
 }
@@ -274,6 +277,8 @@ export function limitForecast(percent: number, resetsAt: string | undefined, kin
   const win = WINDOW_MS[kind]
   const reset = resetsAt ? Date.parse(resetsAt) : NaN
   if (win === undefined || !Number.isFinite(reset)) return { projected: null, fillInMs: null, verdict: 'early' }
+  // Already full: say so, even early in the window.
+  if (percent >= 100) return { projected: percent, fillInMs: 0, verdict: 'over' }
   const elapsed = now - (reset - win)
   const left = Math.max(0, reset - now)
   if (percent <= 0) return { projected: 0, fillInMs: null, verdict: 'idle' }
@@ -317,7 +322,7 @@ function ringSvg(percent: number | undefined, lang: Lang, size = RING, stroke = 
       (dash > 0
         ? `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${dash.toFixed(2)} ${len.toFixed(2)}" transform="rotate(-90 ${c} ${c})"/>`
         : '') +
-      `<text x="${c}" y="${c}" text-anchor="middle" dominant-baseline="central" font-family="${FONT}" font-size="${Math.round(size / 3.9)}" font-weight="700" fill="${color}">${esc(label)}</text>`,
+      `<text x="${c}" y="${c}" text-anchor="middle" dominant-baseline="central" font-family="${FONT}" font-size="${Math.round(size / 3.6)}" font-weight="800" fill="${color}">${esc(label)}</text>`,
   )
 }
 
@@ -414,7 +419,7 @@ function forecastBarSvg(percent: number, projected: number | null, verdict: Limi
 function costChartSvg(values: number[], lang: Lang): string {
   const W = PANEL_W
   const H = 150
-  const left = 44
+  const left = 50
   const top = 18
   const bottom = 22
   const plotW = W - left - 8
@@ -427,7 +432,7 @@ function costChartSvg(values: number[], lang: Lang): string {
   for (const f of [0, 0.5, 1]) {
     const y = top + plotH - f * plotH
     body += `<line x1="${left}" y1="${y.toFixed(1)}" x2="${W - 8}" y2="${y.toFixed(1)}" stroke="${TRACK}" stroke-width="1"/>`
-    body += `<text x="${left - 6}" y="${y.toFixed(1)}" text-anchor="end" dominant-baseline="central" font-family="${FONT}" font-size="11" fill="${MUTED}">${esc(fmtUsd(max * f, lang))}</text>`
+    body += `<text x="${left - 6}" y="${y.toFixed(1)}" text-anchor="end" dominant-baseline="central" font-family="${FONT}" font-size="12" font-weight="500" fill="${MUTED}">${esc(fmtUsd(max * f, lang))}</text>`
   }
   const maxIdx = values.indexOf(Math.max(...values))
   values.forEach((v, i) => {
@@ -437,9 +442,9 @@ function costChartSvg(values: number[], lang: Lang): string {
     const isLast = i === values.length - 1
     body += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="3" fill="${COLOR.cost}" fill-opacity="${isLast ? 1 : 0.5}"/>`
     if (isLast || i === maxIdx) {
-      body += `<text x="${(x + barW / 2).toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="11" font-weight="600" fill="${COLOR.cost}">${esc(fmtUsd(v, lang))}</text>`
+      body += `<text x="${(x + barW / 2).toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700" fill="${COLOR.cost}">${esc(fmtUsd(v, lang))}</text>`
     }
-    body += `<text x="${(x + barW / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="${MUTED}">${i + 1}</text>`
+    body += `<text x="${(x + barW / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-family="${FONT}" font-size="11" font-weight="500" fill="${MUTED}">${i + 1}</text>`
   })
   return svg(W, H, body)
 }
@@ -484,10 +489,14 @@ export const register: Register = (on, options) => {
   // reads it once at its start, so one drawing never mixes two languages.
   let currentLang: Lang = pickLang(options.language, undefined)
   const m = () => MESSAGES[currentLang]
+  // /remote-control runs only under the terminal's REPL; a session the desktop
+  // app (or any SDK host) runs answers "isn't available in this environment".
+  let canToggleRemote = false
 
   on('session.start', async ($, e, next) => {
     const locale = (await $.env.get('LC_ALL')) || (await $.env.get('LC_MESSAGES')) || (await $.env.get('LANG'))
     currentLang = pickLang(options.language, locale)
+    canToggleRemote = e.isInteractive
     await $.command.register({
       name: currentLang === 'tr' ? 'kullanim' : 'usage-strip',
       description: m().cmdStrip,
@@ -573,6 +582,13 @@ export const register: Register = (on, options) => {
     if (e.origin.kind === 'task-notification') {
       const out = parseNotification(e.text, await $.clock.now())
       if (out) await update($, outputsAtom, list => [...list.filter(o => o.id !== out.id), out].slice(-15))
+      // A job that ended leaves the running list now, not at the next reply's end.
+      const ended = /<status>\s*(completed|failed|killed)\s*<\/status>/.test(e.text)
+      if (out && ended) {
+        await update($, bgAtom, bg =>
+          bg.tasks.some(t => t.id === out.id) ? { ...bg, tasks: bg.tasks.filter(t => t.id !== out.id) } : bg,
+        )
+      }
       $.ui.invalidate('ui.render')
     }
     return next(e)
@@ -643,7 +659,7 @@ export const register: Register = (on, options) => {
       const below = await next(e)
       const collapsed = (
         <Box flexDirection="row" justifyContent="flex-end" alignItems="center" columnGap={1}>
-          <Text size="caption" color={MUTED}>
+          <Text size="footnote" color={MUTED}>
             {M.hiddenNote}
           </Text>
           <Button key="show" label={M.show} plain onPress={() => void update($, isHidden, () => false)} />
@@ -719,11 +735,11 @@ export const register: Register = (on, options) => {
               {g.percent === undefined ? '—' : `${barText(g.percent)} ${fmtPct(Math.round(g.percent), lang)}`}
             </Text>
           ),
-          <Text key="l" size="caption" weight="semibold">
+          <Text key="l" size="footnote" weight="bold">
             {g.label}
           </Text>,
           g.detail ? (
-            <Text key="d" size="caption" tabular>
+            <Text key="d" size="footnote" tabular>
               {g.detail}
             </Text>
           ) : null,
@@ -744,10 +760,10 @@ export const register: Register = (on, options) => {
       t.requests > 0
         ? card('tokens', [
             <Box key="t" flexDirection="row" justifyContent="space-between" alignItems="center" columnGap={2}>
-              <Text size="caption" weight="semibold">
+              <Text size="footnote" weight="bold">
                 {M.tokens}
               </Text>
-              <Text size="heading" weight="bold" tabular>
+              <Text size="title" weight="bold" tabular>
                 {fmtTokens(total, lang)}
               </Text>
             </Box>,
@@ -755,10 +771,10 @@ export const register: Register = (on, options) => {
             <Box key="lg" flexDirection="row" columnGap={1}>
               {parts.map(p => (
                 <Box key={p.name} flexDirection="row">
-                  <Text size="caption" color={p.color}>
+                  <Text size="footnote" color={p.color}>
                     ●
                   </Text>
-                  <Text size="caption" tabular>
+                  <Text size="footnote" tabular>
                     {` ${p.name} ${fmtShare(p.value, total, lang)}`}
                   </Text>
                 </Box>
@@ -772,17 +788,17 @@ export const register: Register = (on, options) => {
     const costCard = usage.cost
       ? card('cost', [
           <Box key="t" flexDirection="row" justifyContent="space-between" alignItems="center" columnGap={2}>
-            <Text size="caption" weight="semibold">
+            <Text size="footnote" weight="bold">
               {M.apiCost}
             </Text>
-            <Text size="heading" weight="bold" tabular color={COLOR.cost}>
+            <Text size="title" weight="bold" tabular color={COLOR.cost}>
               {fmtUsd(usage.cost.usd, lang)}
             </Text>
           </Box>,
           Svg && history.length > 0 ? (
             <Svg key="s" source={sparkSvg(history)} alt={M.costPerMessage} width={SPARK_W} height={SPARK_H} />
           ) : null,
-          <Text key="d" size="caption" tabular>
+          <Text key="d" size="footnote" tabular>
             {last === undefined ? M.sessionTotal : `${M.lastMessage} ${fmtUsd(last, lang)}`}
           </Text>,
         ])
@@ -862,7 +878,7 @@ export const register: Register = (on, options) => {
 
     const heading = (text: string, right?: RenderChildren) => (
       <Box key={'h-' + text} flexDirection="row" justifyContent="space-between" columnGap={2}>
-        <Text weight="semibold" size="body">
+        <Text weight="bold" size="heading">
           {text}
         </Text>
         {right ?? null}
@@ -894,12 +910,12 @@ export const register: Register = (on, options) => {
       const card = (key: string, title: string, target: StripTab | null, right: string, body: RenderChildren[], grow = false) => (
         <Box key={key} flexDirection="column" flexGrow={grow ? 1 : 0} width={grow ? '48%' : undefined} borderStyle="round" borderDimColor paddingX={1}>
           <Box flexDirection="row" justifyContent="space-between" alignItems="center" columnGap={1}>
-            <Text size="caption" weight="semibold" color={MUTED}>
+            <Text size="footnote" weight="bold" color={MUTED}>
               {title.toLocaleUpperCase(lang === 'tr' ? 'tr' : 'en')}
             </Text>
             <Box flexDirection="row" alignItems="center" columnGap={1}>
               {right ? (
-                <Text size="caption" tabular>
+                <Text size="footnote" tabular>
                   {right}
                 </Text>
               ) : null}
@@ -931,7 +947,9 @@ export const register: Register = (on, options) => {
               const nowPct = fmtPct(Math.round(r.percentUsed), lang)
               const verdictText =
                 fc.verdict === 'over' && fc.fillInMs !== null
-                  ? M.verdictOver(fmtDuration(fc.fillInMs + 59_999, lang))
+                  ? fc.fillInMs <= 0
+                    ? M.verdictFull
+                    : M.verdictOver(fmtDuration(fc.fillInMs + 59_999, lang))
                   : fc.verdict === 'tight'
                     ? M.verdictTight
                     : fc.verdict === 'safe'
@@ -945,7 +963,7 @@ export const register: Register = (on, options) => {
                 <Box key={'fc-' + r.kind} flexDirection="column">
                   {line(
                     'l1',
-                    <Text weight="semibold">{name}</Text>,
+                    <Text weight="bold">{name}</Text>,
                     <Text tabular>
                       {fc.projected === null ? nowPct : M.projected(nowPct, fmtPct(fc.projected >= 100 ? '100+' : Math.round(fc.projected), lang))}
                     </Text>,
@@ -957,10 +975,10 @@ export const register: Register = (on, options) => {
                   )}
                   {line(
                     'l2',
-                    <Text size="caption" color={verdictColor}>
+                    <Text size="footnote" color={verdictColor}>
                       {verdictText}
                     </Text>,
-                    <Text size="caption" tabular color={MUTED}>
+                    <Text size="footnote" tabular color={MUTED}>
                       {resetText(r.resetsAt, now, lang)}
                     </Text>,
                   )}
@@ -1000,14 +1018,14 @@ export const register: Register = (on, options) => {
               <Box key="legend" flexDirection="row" flexWrap="wrap" columnGap={2}>
                 {used.slice(0, 4).map(s => (
                   <Box key={'cl-' + s.name} flexDirection="row">
-                    <Text size="caption" color={s.color}>
+                    <Text size="footnote" color={s.color}>
                       ●
                     </Text>
-                    <Text size="caption" tabular>{` ${s.name} ${fmtShare(s.tokens, bd.rawMaxTokens, lang)}`}</Text>
+                    <Text size="footnote" tabular>{` ${s.name} ${fmtShare(s.tokens, bd.rawMaxTokens, lang)}`}</Text>
                   </Box>
                 ))}
               </Box>,
-              <Text key="fc" size="caption" color={fc.messagesLeft !== null && fc.messagesLeft <= 3 ? 'warning' : MUTED}>
+              <Text key="fc" size="footnote" color={fc.messagesLeft !== null && fc.messagesLeft <= 3 ? 'warning' : MUTED}>
                 {forecast.join(' · ')}
               </Text>,
             ],
@@ -1024,32 +1042,32 @@ export const register: Register = (on, options) => {
         sections.push(
           card('cost', M.tabs.cost ?? M.apiCost, 'cost', fmtUsd(usage.cost.usd, lang), [
             history.length === 0 ? (
-              <Text key="none" size="caption">
+              <Text key="none" size="footnote">
                 {M.noMessages}
               </Text>
             ) : Svg ? (
               <Svg key="chart" source={costMiniSvg(history)} alt={M.altCostChart} />
             ) : (
-              <Text key="chart" size="caption" tabular>
+              <Text key="chart" size="footnote" tabular>
                 {history.slice(-8).map(v => fmtUsd(v, lang)).join('  ')}
               </Text>
             ),
             <Box key="figures" flexDirection="row" justifyContent="space-between" columnGap={2}>
-              <Text size="caption" tabular>
+              <Text size="footnote" tabular>
                 {`${M.lastHour} `}
-                <Text size="caption" weight="semibold" color={COLOR.cost}>
+                <Text size="footnote" weight="bold" color={COLOR.cost}>
                   {fmtUsd(lastHour, lang)}
                 </Text>
               </Text>
-              <Text size="caption" tabular>
+              <Text size="footnote" tabular>
                 {`${M.avgMsg} `}
-                <Text size="caption" weight="semibold">
+                <Text size="footnote" weight="bold">
                   {fmtUsd(avg, lang)}
                 </Text>
               </Text>
-              <Text size="caption" tabular>
+              <Text size="footnote" tabular>
                 {`${M.priciestMsg} `}
-                <Text size="caption" weight="semibold">
+                <Text size="footnote" weight="bold">
                   {fmtUsd(priciest, lang)}
                 </Text>
               </Text>
@@ -1064,10 +1082,10 @@ export const register: Register = (on, options) => {
         .slice(0, 5)
       const stat = (key: string, label: string, value: string, color?: Color) => (
         <Box key={key} flexDirection="column" flexGrow={1}>
-          <Text size="caption" color={MUTED}>
+          <Text size="footnote" color={MUTED}>
             {label}
           </Text>
-          <Text weight="bold" tabular color={color}>
+          <Text size="heading" weight="bold" tabular color={color}>
             {value}
           </Text>
         </Box>
@@ -1081,17 +1099,17 @@ export const register: Register = (on, options) => {
             {stat('tools', M.toolCalls, String(toolStats.total))}
           </Box>,
           topTools.length === 0 ? (
-            <Text key="tools-none" size="caption" color={MUTED}>
+            <Text key="tools-none" size="footnote" color={MUTED}>
               {M.noTools}
             </Text>
           ) : (
             <Box key="tools-top" flexDirection="row" flexWrap="wrap" columnGap={2}>
               {topTools.map(([name, n], i) => (
                 <Box key={'tool-' + name} flexDirection="row">
-                  <Text size="caption" color={CATEGORY_COLORS[i % CATEGORY_COLORS.length]}>
+                  <Text size="footnote" color={CATEGORY_COLORS[i % CATEGORY_COLORS.length]}>
                     ●
                   </Text>
-                  <Text size="caption" tabular>{` ${toolLabel(name)} ${n}`}</Text>
+                  <Text size="footnote" tabular>{` ${toolLabel(name)} ${n}`}</Text>
                 </Box>
               ))}
             </Box>
@@ -1117,12 +1135,12 @@ export const register: Register = (on, options) => {
             'background',
             '',
             [
-              <Text key="glance" size="caption" color={jobs.length > 0 ? 'success' : MUTED}>
+              <Text key="glance" size="footnote" color={jobs.length > 0 ? 'success' : MUTED}>
                 {glance ? '⚙ ' + glance : M.bgNothing}
               </Text>,
               ...jobs.slice(0, 2).map(j => (
-                <Text key={'jm-' + j.key} size="caption">
-                  <Text size="caption" color={TASK_COLORS[j.type] ?? MUTED}>
+                <Text key={'jm-' + j.key} size="footnote">
+                  <Text size="footnote" color={TASK_COLORS[j.type] ?? MUTED}>
                     ●
                   </Text>
                   {` ${clip(j.description || j.command || '', 34)}`}
@@ -1138,17 +1156,17 @@ export const register: Register = (on, options) => {
             '',
             latest.length === 0
               ? [
-                  <Text key="none" size="caption" color={MUTED}>
+                  <Text key="none" size="footnote" color={MUTED}>
                     {M.noFiles}
                   </Text>,
                 ]
               : latest.map(x => (
-                  <Text key={x.key} size="caption">
-                    <Text size="caption" color={x.color}>
+                  <Text key={x.key} size="footnote">
+                    <Text size="footnote" color={x.color}>
                       {x.icon}
                     </Text>
                     {x.mono ? (
-                      <Text size="caption" mono>{` ${clip(x.text, 30)}`}</Text>
+                      <Text size="footnote" mono>{` ${clip(x.text, 30)}`}</Text>
                     ) : (
                       ` ${clip(x.text, 34)}`
                     )}
@@ -1195,9 +1213,9 @@ export const register: Register = (on, options) => {
                 <Box flexDirection="row">
                   <Text color={d.color}>●</Text>
                   <Text>{` ${d.name}`}</Text>
-                  {d.note ? <Text size="caption" color={MUTED}>{`  ${d.note}`}</Text> : null}
+                  {d.note ? <Text size="footnote" color={MUTED}>{`  ${d.note}`}</Text> : null}
                 </Box>
-                <Text tabular weight="semibold">{`${fmtTokens(d.value, lang)}  ${fmtShare(d.value, totalTokens, lang)}`}</Text>
+                <Text tabular weight="bold">{`${fmtTokens(d.value, lang)}  ${fmtShare(d.value, totalTokens, lang)}`}</Text>
               </Box>
               {Svg ? <Svg source={stackSvg([{ value: d.value, color: d.color }], PANEL_W, 6, biggest)} alt={`${d.name} ${M.altBar}`} /> : null}
             </Box>
@@ -1205,7 +1223,7 @@ export const register: Register = (on, options) => {
         </Box>,
       )
       sections.push(
-        <Text key="foot" size="caption" color={MUTED}>
+        <Text key="foot" size="footnote" color={MUTED}>
           {M.footnote}
         </Text>,
       )
@@ -1235,7 +1253,7 @@ export const register: Register = (on, options) => {
           <Box key="context" flexDirection="column" rowGap={1}>
             {heading(
               M.contextWhat,
-              <Text tabular weight="semibold" color={TEXT_COLOR[level(bd.percentage)]}>
+              <Text tabular weight="bold" color={TEXT_COLOR[level(bd.percentage)]}>
                 {`${fmtPct(Math.round(bd.percentage), lang)} · ${fmtTokens(bd.totalTokens, lang)} / ${fmtTokens(bd.rawMaxTokens, lang)}`}
               </Text>,
             )}
@@ -1279,13 +1297,13 @@ export const register: Register = (on, options) => {
           <Box flexDirection="row" justifyContent="space-between" columnGap={2}>
             <Box flexDirection="row">
               <Text color={TASK_COLORS[j.type] ?? MUTED}>●</Text>
-              <Text weight="semibold">{` ${M.taskTypes[j.type] ?? j.type}`}</Text>
+              <Text weight="bold">{` ${M.taskTypes[j.type] ?? j.type}`}</Text>
             </Box>
             <Text color={statusColor(j.status)}>{M.statuses[j.status] ?? j.status}</Text>
           </Box>
           <Text>{clip(j.description, 120)}</Text>
           {j.command ? (
-            <Text size="caption" mono color={MUTED}>
+            <Text size="footnote" mono color={MUTED}>
               {clip(j.command, 140)}
             </Text>
           ) : null}
@@ -1323,7 +1341,7 @@ export const register: Register = (on, options) => {
             bg.crons.map(c => (
               <Box key={'c-' + c.id} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
                 <Box flexDirection="row" justifyContent="space-between" columnGap={2}>
-                  <Text mono weight="semibold">
+                  <Text mono weight="bold">
                     {c.schedule}
                   </Text>
                   <Text color={MUTED}>{c.recurring ? M.recurring : M.once}</Text>
@@ -1335,7 +1353,7 @@ export const register: Register = (on, options) => {
         </Box>,
       )
       sections.push(
-        <Text key="bg-foot" size="caption" color={MUTED}>
+        <Text key="bg-foot" size="footnote" color={MUTED}>
           {bg.at === null ? M.bgNotYet : M.bgUpdated(fmtAgo(now - bg.at, lang))}
         </Text>,
       )
@@ -1356,9 +1374,9 @@ export const register: Register = (on, options) => {
                   <Box flexDirection="row">
                     <Text color={FILE_COLORS[f.action]}>{f.action === 'written' ? '+' : '✎'}</Text>
                     <Text mono>{` ${baseName(f.path)}`}</Text>
-                    <Text size="caption" color={MUTED}>{`  ${clip(shortPath(f.path.slice(0, -baseName(f.path).length)), 40)}`}</Text>
+                    <Text size="footnote" color={MUTED}>{`  ${clip(shortPath(f.path.slice(0, -baseName(f.path).length)), 40)}`}</Text>
                   </Box>
-                  <Text size="caption" color={MUTED}>
+                  <Text size="footnote" color={MUTED}>
                     {[M.fileActions[f.action] ?? f.action, f.count > 1 ? M.times(f.count) : '', fmtAgo(now - f.at, lang)]
                       .filter(Boolean)
                       .join(' · ')}
@@ -1366,7 +1384,7 @@ export const register: Register = (on, options) => {
                 </Box>
               ))}
               {fileList.length > 12 ? (
-                <Text size="caption" color={MUTED}>
+                <Text size="footnote" color={MUTED}>
                   {M.more(fileList.length - 12)}
                 </Text>
               ) : null}
@@ -1386,18 +1404,18 @@ export const register: Register = (on, options) => {
                 <Box flexDirection="row" justifyContent="space-between" columnGap={2}>
                   <Box flexDirection="row">
                     <Text color={statusColor(o.status)}>{statusIcon(o.status)}</Text>
-                    <Text weight="semibold" color={statusColor(o.status)}>{` ${M.statuses[o.status] ?? o.status}`}</Text>
+                    <Text weight="bold" color={statusColor(o.status)}>{` ${M.statuses[o.status] ?? o.status}`}</Text>
                   </Box>
-                  <Text size="caption" color={MUTED}>
+                  <Text size="footnote" color={MUTED}>
                     {[o.durationMs !== null ? M.ranFor(fmtRunTime(o.durationMs, lang)) : '', fmtAgo(now - o.at, lang)]
                       .filter(Boolean)
                       .join(' · ')}
                   </Text>
                 </Box>
                 <Text>{o.summary}</Text>
-                {o.result ? <Text size="caption">{clip(o.result, 600)}</Text> : null}
+                {o.result ? <Text size="footnote">{clip(o.result, 600)}</Text> : null}
                 {o.outputFile ? (
-                  <Text size="caption" mono color={MUTED}>
+                  <Text size="footnote" mono color={MUTED}>
                     {`${M.outputFile} ${shortPath(o.outputFile)}`}
                   </Text>
                 ) : null}
@@ -1423,13 +1441,13 @@ export const register: Register = (on, options) => {
           <Text>{label}</Text>
           <Box flexDirection="column" alignItems="flex-end">
             {typeof value === 'string' ? (
-              <Text weight="semibold" color={color}>
+              <Text weight="bold" color={color}>
                 {value}
               </Text>
             ) : (
               value
             )}
-            {sub ? <Text size="caption">{sub}</Text> : null}
+            {sub ? <Text size="footnote">{sub}</Text> : null}
           </Box>
         </Box>
       )
@@ -1437,7 +1455,8 @@ export const register: Register = (on, options) => {
         try {
           const r = await $.command.run({ command: 'remote-control' })
           const msg = (r.text ?? '').replace(/\s+/g, ' ').trim()
-          $.ui.toast(msg ? msg.slice(0, 200) : M.remoteDone)
+          if (/not available|isn't available/i.test(msg)) $.ui.toast(M.remoteInApp)
+          else $.ui.toast(msg ? msg.slice(0, 200) : M.remoteDone)
         } catch (err) {
           $.ui.toast(M.remoteFail + (err instanceof Error ? err.message : String(err)).slice(0, 160))
         }
@@ -1459,7 +1478,13 @@ export const register: Register = (on, options) => {
           <Box flexDirection="column" rowGap={1} borderStyle="round" borderDimColor paddingX={1}>
             {row('rc', M.remote, phoneOn ? M.phoneOn : M.phoneOff, undefined, phoneOn ? 'success' : undefined)}
             <Box key="rc-btn" flexDirection="row" justifyContent="flex-end">
-              <Button key="rc" label={M.remoteToggle} variant="primary" onPress={() => void toggleRemote()} />
+              {canToggleRemote ? (
+                <Button key="rc" label={M.remoteToggle} variant="primary" onPress={() => void toggleRemote()} />
+              ) : (
+                <Text key="rc-hint" size="footnote" color={MUTED}>
+                  {M.remoteInApp}
+                </Text>
+              )}
             </Box>
             {row('folder', M.folder, folderValue, isFolderOpen ? shortPath(cwd) : undefined)}
             {row('model', M.model, modelName(model, M))}

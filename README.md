@@ -72,7 +72,7 @@ The `language` option is `auto` by default: Turkish when your system locale star
 - **Counters start when the mod loads:** tokens, reply times and tool calls count every request from then on, subagents included. The cost-per-message chart counts only replies to your own messages.
 - **Forecasts are estimates.** Limit forecasts use your average pace since the window opened and wait until 5% of it has passed; context forecasts need a few replies. Both refresh after every reply.
 - **The Background list refreshes at the end of every reply**; subagents show live.
-- **Remote Control toggle** runs Claude Code's own `/remote-control` command and shows its answer as a notification.
+- **Remote Control toggle** runs Claude Code's own `/remote-control` command and shows its answer as a notification. That command only runs in a terminal session; in the desktop app the panel shows the connection status and points to the app's own setting instead.
 
 ## Privacy
 
@@ -85,7 +85,7 @@ claude plugin validate .
 claude plugin test .
 ```
 
-The test suite (23 tests) covers both languages on every surface, a language that settles mid-load, edge cases (no limits, no cost, context not measured), hide/show, every tab, the limit and context forecasts, background jobs and their notifications, file tracking, session stats, the folder name, the Remote Control button, the per-message cost history and the token counter.
+The test suite (29 tests) covers both languages on every surface, a language that settles mid-load, edge cases (no limits, no cost, context not measured), hide/show, every tab, the limit and context forecasts, background jobs and their notifications, file tracking, session stats, the folder name, the Remote Control button, the per-message cost history and the token counter.
 
 ## Credits
 

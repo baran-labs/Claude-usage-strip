@@ -12,7 +12,8 @@ export function pickLang(option: unknown, locale: string | undefined): Lang {
 const DOT = { tr: ',', en: '.' }
 
 export function fmtTokens(n: number, lang: Lang): string {
-  if (n >= 1_000_000) return (Math.round(n / 100_000) / 10).toString().replace('.', DOT[lang]) + ' M'
+  // From 999.5K up, "1000K" would round: show it as millions.
+  if (n >= 999_500) return (Math.round(n / 100_000) / 10).toString().replace('.', DOT[lang]) + ' M'
   if (n >= 1_000) return Math.round(n / 1_000) + (lang === 'tr' ? ' bin' : 'K')
   return String(Math.round(n))
 }
@@ -163,6 +164,7 @@ const TR = {
   verdictSafe: 'Bu hızla rahat yetişir',
   verdictTight: 'Bu hızla sınıra yaklaşır',
   verdictOver: (t: string) => `Bu hızla ~${t} sonra dolar`,
+  verdictFull: 'Limit doldu, sıfırlanmayı bekle',
   tooEarly: 'Tahmin için henüz erken',
   noUse: 'Bu pencerede henüz kullanım yok',
   contextForecast: 'Bağlam tahmini',
@@ -206,6 +208,7 @@ const TR = {
   remoteToggle: 'Uzaktan kontrolü aç / kapat',
   remoteDone: 'Uzaktan kontrol komutu çalıştırıldı.',
   remoteFail: 'Uzaktan kontrol değiştirilemedi: ',
+  remoteInApp: 'Masaüstü uygulamasında uzaktan kontrolü uygulamanın kendi ayarlarından aç.',
   folder: 'Klasör',
   model: 'Model',
   git: 'Git',
@@ -320,6 +323,7 @@ const EN: Messages = {
   verdictSafe: 'At this pace you have plenty of room',
   verdictTight: 'At this pace you get close to the limit',
   verdictOver: (t: string) => `At this pace it runs out in ~${t}`,
+  verdictFull: 'Limit reached; wait for the reset',
   tooEarly: 'Too early to forecast',
   noUse: 'No use in this window yet',
   contextForecast: 'Context forecast',
@@ -360,6 +364,7 @@ const EN: Messages = {
   remoteToggle: 'Toggle Remote Control',
   remoteDone: 'Remote Control command ran.',
   remoteFail: 'Could not toggle Remote Control: ',
+  remoteInApp: "In the desktop app, turn Remote Control on from the app's own settings.",
   folder: 'Folder',
   model: 'Model',
   git: 'Git',

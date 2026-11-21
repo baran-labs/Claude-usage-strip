@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
-import { fmtAgo, fmtDuration, fmtPct, fmtRunTime, fmtShare, fmtTokens, fmtUsd, pickLang } from '../hooks/i18n'
-import { contextForecast, limitForecast, parseNotification, toolLabel } from '../hooks/register'
+import { MESSAGES, fmtAgo, fmtDuration, fmtPct, fmtRunTime, fmtShare, fmtTokens, fmtUsd, pickLang } from '../hooks/i18n'
+import { contextForecast, limitForecast, modelName, parseNotification, toolLabel } from '../hooks/register'
 
 // ---------- Shared fixtures ----------
 const BAND = {
@@ -43,7 +43,7 @@ type World = {
   surfaces: string[]
   env: Record<string, string>
   cwd: string
-  remote: 'ok' | 'fail'
+  remote: 'ok' | 'fail' | 'unavailable'
   agents: Agent[]
   ran: string[]
   toasts: string[]
@@ -118,6 +118,7 @@ function stubEngine(on: AnyOn, w: World) {
   on('command.run', (_: unknown, e: { command: string }) => {
     w.ran.push(e.command)
     if (w.remote === 'fail') throw new Error('not available here')
+    if (w.remote === 'unavailable') return { text: "/remote-control isn't available in this environment." }
     return { text: 'Remote Control connected' }
   })
   on('ui.toast', (_: unknown, e: { text?: unknown }) => {
@@ -727,5 +728,99 @@ test('a drawing before the language is known stays in one language, then switche
   const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect((await pane.find({ type: 'Button', key: 'tab-overview' }))?.props.label).toBe('Genel')
   expect((await pane.find({ type: 'Text', text: /^%41/ }))?.text).toBe('%41 → sıfırlanırken ~%50')
+  await pane.unmount()
+})
+
+// ---------- 11. Fixes in 1.1.1 ----------
+test('just under a million tokens reads as millions, not "1000K"', async () => {
+  expect(fmtTokens(999_600, 'en')).toBe('1 M')
+  expect(fmtTokens(999_600, 'tr')).toBe('1 M')
+  expect(fmtTokens(999_400, 'en')).toBe('999K')
+})
+
+test('model names: a dated id drops its date', async () => {
+  const M = MESSAGES.en
+  expect(modelName('claude-opus-5-5[1m]', M)).toBe('Opus 5.5 (1M context)')
+  expect(modelName('claude-sonnet-4-20250514', M)).toBe('Sonnet 4')
+  expect(modelName('claude-opus-4-5-20251101', M)).toBe('Opus 4.5')
+  expect(modelName('claude-haiku-5-5', M)).toBe('Haiku 5.5')
+  expect(modelName('opus', M)).toBe('opus')
+})
+
+test('a full limit says so, even early in its window', { options: { language: 'en' } }, async ($, on) => {
+  const H = 3_600_000
+  // 10 minutes into a 5 h window and already at 100%
+  expect(limitForecast(100, new Date(5 * H - 10 * 60_000).toISOString(), 'five_hour', 0)).toEqual({
+    projected: 100,
+    fillInMs: 0,
+    verdict: 'over',
+  })
+  const w = world()
+  w.rateLimits = [{ kind: 'five_hour', percentUsed: 100, resetsAt: new Date(2 * H).toISOString() }]
+  stubEngine(on as AnyOn, w)
+  await $.session.start(start)
+  const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect((await pane.find({ type: 'Text', text: 'Limit reached; wait for the reset' }))?.props.color).toBe('error')
+  expect(await pane.find({ type: 'Text', text: /runs out in/ })).toBeUndefined()
+  await pane.unmount()
+})
+
+test('a finished job leaves the running list when its notification arrives', { options: { language: 'en' } }, async ($, on) => {
+  const w = world()
+  stubEngine(on as AnyOn, w)
+  await $.session.start(start)
+  await $.classic.Stop({
+    stop_hook_active: false,
+    background_tasks: [
+      { id: 'b1', type: 'shell', status: 'running', description: 'Build', command: 'npm run build' },
+      { id: 'm1', type: 'monitor', status: 'running', description: 'Watch logs' },
+    ],
+    session_crons: [],
+  } as never)
+  const jobs = async () => {
+    const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    const label = (await band.find({ type: 'Button', key: 'jobs' }))?.props.label
+    await band.unmount()
+    return label
+  }
+  expect(await jobs()).toBe('⚙ 2 jobs')
+  const deliver = (text: string) => $.session.receive({ origin: { kind: 'task-notification' }, text } as never)
+  // The build ended: gone at once, not at the next reply's end
+  await deliver('<task-notification><task-id>b1</task-id><status>completed</status><summary>Background command "npm run build" completed (exit code 0)</summary></task-notification>')
+  expect(await jobs()).toBe('⚙ 1 job')
+  // A notification that names no end leaves its job running
+  await deliver('<task-notification><task-id>m1</task-id><summary>New log line</summary></task-notification>')
+  expect(await jobs()).toBe('⚙ 1 job')
+  await deliver('<task-notification><task-id>m1</task-id><status>killed</status><summary>Monitor stopped</summary></task-notification>')
+  expect(await jobs()).toBeUndefined()
+})
+
+test('Remote Control in the desktop app: no dead button, a pointer to the app instead', { options: { language: 'tr' } }, async ($, on) => {
+  const w = world()
+  stubEngine(on as AnyOn, w)
+  // The desktop app runs its sessions without a REPL
+  await $.session.start({ cwd: '/', surface: null, isInteractive: false } as never)
+  let pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await pane.press({ key: 'tab-env' })
+  await pane.unmount()
+  pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await pane.find({ type: 'Button', key: 'rc' })).toBeUndefined()
+  expect((await pane.find({ type: 'Text', text: /uzaktan kontrolü/ }))?.text).toBe(
+    'Masaüstü uygulamasında uzaktan kontrolü uygulamanın kendi ayarlarından aç.',
+  )
+  await pane.unmount()
+})
+
+test('Remote Control answering "not available" is explained, not echoed', { options: { language: 'en' } }, async ($, on) => {
+  const w = world()
+  w.remote = 'unavailable'
+  stubEngine(on as AnyOn, w)
+  await $.session.start(start)
+  let pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await pane.press({ key: 'tab-env' })
+  await pane.unmount()
+  pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await pane.press({ key: 'rc' })
+  expect(w.toasts.at(-1)).toBe("In the desktop app, turn Remote Control on from the app's own settings.")
   await pane.unmount()
 })
