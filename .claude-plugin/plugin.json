@@ -1,10 +1,10 @@
 {
   "name": "usage-strip",
-  "version": "1.0.0",
-  "description": "Context fill, plan limits, tokens and API-price cost as visual cards above the prompt, plus a detailed usage panel. Turkish and English.",
+  "version": "1.1.0",
+  "description": "Context fill, plan limits, tokens and API-price cost as visual cards above the prompt, plus a one-screen dashboard with limit and context forecasts, background jobs and outputs. Turkish and English.",
   "author": { "name": "Baran" },
   "license": "MIT",
-  "keywords": ["usage", "context", "limits", "tokens", "cost", "mod", "turkish"],
+  "keywords": ["usage", "context", "limits", "forecast", "tokens", "cost", "background", "dashboard", "mod", "turkish"],
   "types": "./types/index.d.ts",
   "userConfig": {
     "language": {
