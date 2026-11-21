@@ -1,6 +1,6 @@
 {
   "name": "usage-strip",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Context fill, plan limits, tokens and API-price cost as visual cards above the prompt, plus a one-screen dashboard with limit and context forecasts, background jobs and outputs. Turkish and English.",
   "author": { "name": "Baran" },
   "license": "MIT",

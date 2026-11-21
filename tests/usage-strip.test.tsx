@@ -200,9 +200,9 @@ test('strip draws in Turkish on every surface', { options: { language: 'tr' } },
   await $.session.start(start)
   for (const surface of ['terminal', 'desktop', 'vscode', 'mobile'] as const) {
     const band = await $.ui.mount({ ...BAND, surface })
-    expect((await band.find({ type: 'Text', text: 'Bağlam' }))?.text).toBe('Bağlam')
+    expect((await band.find({ type: 'Text', text: 'BAĞLAM' }))?.text).toBe('BAĞLAM')
     expect((await band.find({ type: 'Text', text: /213 bin/ }))?.text).toBe('213 bin / 1 M')
-    expect((await band.find({ type: 'Text', text: '5 saatlik' }))?.text).toBe('5 saatlik')
+    expect((await band.find({ type: 'Text', text: '5 SAATLİK' }))?.text).toBe('5 SAATLİK')
     expect((await band.find({ type: 'Text', text: /↻ 54 dk/ }))?.text).toBe('↻ 54 dk')
     expect((await band.find({ type: 'Text', text: /4,55/ }))?.text).toBe('$4,55')
     expect((await band.find({ type: 'Button', key: 'hide' }))?.props.label).toBe('Gizle ▾')
@@ -219,12 +219,12 @@ test('strip draws in English', { options: { language: 'en' } }, async ($, on) =>
   await $.session.start(start)
   for (const surface of ['terminal', 'desktop'] as const) {
     const band = await $.ui.mount({ ...BAND, surface })
-    expect((await band.find({ type: 'Text', text: 'Context' }))?.text).toBe('Context')
+    expect((await band.find({ type: 'Text', text: 'CONTEXT' }))?.text).toBe('CONTEXT')
     expect((await band.find({ type: 'Text', text: /213K/ }))?.text).toBe('213K / 1 M')
-    expect((await band.find({ type: 'Text', text: '5-hour' }))?.text).toBe('5-hour')
+    expect((await band.find({ type: 'Text', text: '5-HOUR' }))?.text).toBe('5-HOUR')
     expect((await band.find({ type: 'Text', text: /4\.55/ }))?.text).toBe('$4.55')
     expect((await band.find({ type: 'Button', key: 'hide' }))?.props.label).toBe('Hide ▾')
-    expect(await band.find({ type: 'Text', text: /Bağlam|saatlik|Gizle/ })).toBeUndefined()
+    expect(await band.find({ type: 'Text', text: /BAĞLAM|SAATLİK|Gizle/ })).toBeUndefined()
     await band.unmount()
   }
 })
@@ -235,7 +235,7 @@ test('auto language follows LANG', { options: { language: 'auto' } }, async ($, 
   stubEngine(on as AnyOn, w)
   await $.session.start(start)
   const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect((await band.find({ type: 'Text', text: 'Bağlam' }))?.text).toBe('Bağlam')
+  expect((await band.find({ type: 'Text', text: 'BAĞLAM' }))?.text).toBe('BAĞLAM')
   await band.unmount()
 })
 
@@ -249,8 +249,8 @@ test('no limits, no cost, context not measured: still draws', { options: { langu
   for (const surface of ['terminal', 'desktop'] as const) {
     const band = await $.ui.mount({ ...BAND, surface })
     expect((await band.find({ type: 'Text', text: 'not measured' }))?.text).toBe('not measured')
-    expect(await band.find({ type: 'Text', text: '5-hour' })).toBeUndefined()
-    expect(await band.find({ type: 'Text', text: 'API cost' })).toBeUndefined()
+    expect(await band.find({ type: 'Text', text: '5-HOUR' })).toBeUndefined()
+    expect(await band.find({ type: 'Text', text: 'API COST' })).toBeUndefined()
     await band.unmount()
     for (const tab of ['overview', 'cost', 'context', 'background', 'outputs', 'env']) {
       const pane = await $.ui.mount({ ...PANE, surface })
@@ -268,7 +268,7 @@ test('a survey above the prompt gets the space', { options: { language: 'en' } }
   stubEngine(on as AnyOn, w)
   await $.session.start(start)
   const band = await $.ui.mount({ ...BAND, props: { ...BAND.props, hasSurvey: true }, surface: 'desktop' })
-  expect(await band.find({ type: 'Text', text: 'Context' })).toBeUndefined()
+  expect(await band.find({ type: 'Text', text: 'CONTEXT' })).toBeUndefined()
   await band.unmount()
 })
 
@@ -288,7 +288,7 @@ test('Hide collapses to one line, Show brings it back, commands do the same', { 
   await $.session.start(start)
   const state = async () => {
     const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
-    const open = (await band.find({ type: 'Text', text: 'Bağlam' })) !== undefined
+    const open = (await band.find({ type: 'Text', text: 'BAĞLAM' })) !== undefined
     const collapsed = (await band.find({ type: 'Text', text: 'Kullanım şeridi gizli' })) !== undefined
     await band.unmount()
     return { open, collapsed }
@@ -324,7 +324,7 @@ test('the panel opens on Overview and each tab shows its own sections', { option
   let pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect((await pane.find({ type: 'Button', key: 'tab-overview' }))?.props.variant).toBe('primary')
   // Overview shows what the strip does not: forecasts and stats
-  for (const text of ['LIMIT FORECAST', '5-hour limit', 'Weekly limit', 'CONTEXT', 'COST', 'SESSION', 'BACKGROUND', 'LATEST OUTPUTS']) {
+  for (const text of ['LIMIT FORECAST', '5-hour limit', 'Weekly limit', 'CONTEXT', 'COST', 'SESSION', 'JOBS', 'LATEST OUTPUTS']) {
     expect((await pane.find({ type: 'Text', text }))?.text).toBe(text)
   }
   // 41% after 4.1 h of a 5 h window, 54 min left: about 50% at reset, fine
@@ -372,7 +372,7 @@ test('panel tabs in Turkish', { options: { language: 'tr' } }, async ($, on) => 
   for (const id of ['overview', 'cost', 'context', 'background', 'outputs', 'env']) {
     labels.push((await pane.find({ type: 'Button', key: 'tab-' + id }))?.props.label)
   }
-  expect(labels).toEqual(['Genel', 'Maliyet', 'Bağlam', 'Arka plan', 'Çıktılar', 'Ortam'])
+  expect(labels).toEqual(['Genel', 'Maliyet', 'Bağlam', 'İşler', 'Çıktılar', 'Ortam'])
   expect((await pane.find({ type: 'Text', text: 'LİMİT TAHMİNİ' }))?.text).toBe('LİMİT TAHMİNİ')
   expect((await pane.find({ type: 'Text', text: 'MALİYET' }))?.text).toBe('MALİYET')
   expect((await pane.find({ type: 'Text', text: 'BAĞLAM' }))?.text).toBe('BAĞLAM')
@@ -417,7 +417,7 @@ test('background jobs: snapshot at reply end, live subagents, jobs button, tab c
 
   // The jobs button opened the Background tab
   pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect((await pane.find({ type: 'Button', key: 'tab-background' }))?.props.label).toBe('Arka plan (2)')
+  expect((await pane.find({ type: 'Button', key: 'tab-background' }))?.props.label).toBe('İşler · 2')
   expect((await pane.find({ type: 'Button', key: 'tab-background' }))?.props.variant).toBe('primary')
   expect((await pane.find({ type: 'Text', text: 'npm run build' }))?.text).toBe('npm run build')
   expect((await pane.find({ type: 'Text', text: ' Komut' }))?.text).toBe(' Komut')
@@ -457,7 +457,7 @@ test('outputs: finished jobs are listed newest first, a repeat replaces, other d
   await deliver('The person enabled mod hot-reloading.')
 
   let pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect((await pane.find({ type: 'Button', key: 'tab-outputs' }))?.props.label).toBe('Outputs (2)')
+  expect((await pane.find({ type: 'Button', key: 'tab-outputs' }))?.props.label).toBe('Outputs')
   // Overview previews the newest results
   expect((await pane.find({ type: 'Text', text: 'LATEST OUTPUTS' }))?.text).toBe('LATEST OUTPUTS')
   expect((await pane.find({ type: 'Text', text: /^✗ Agent "Find tests" failed/ }))?.text).toBe('✗ Agent "Find tests" failed')
@@ -474,14 +474,17 @@ test('outputs: finished jobs are listed newest first, a repeat replaces, other d
   // The same job reported again replaces its row
   await deliver('<task-notification><task-id>a7</task-id><status>completed</status><summary>Agent "Find tests" completed</summary></task-notification>')
   pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect((await pane.find({ type: 'Button', key: 'tab-outputs' }))?.props.label).toBe('Outputs (2)')
-  expect(await pane.find({ type: 'Text', text: 'Agent "Find tests" failed' })).toBeUndefined()
+  expect((await pane.findAll({ type: 'Text', text: /^(Agent|Background) / })).map(x => x.text)).toEqual([
+    'Agent "Find tests" completed',
+    'Background command "npm run build" completed (exit code 0)',
+  ])
   await pane.unmount()
 
   // Keeps the newest 15
   for (let i = 0; i < 20; i++) await deliver(`<task-notification><task-id>x${i}</task-id><status>completed</status><summary>job ${i}</summary></task-notification>`)
   pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect((await pane.find({ type: 'Button', key: 'tab-outputs' }))?.props.label).toBe('Outputs (15)')
+  const kept = (await pane.findAll({ type: 'Text', text: /^job \d+$/ })).map(x => x.text)
+  expect(kept).toEqual(Array.from({ length: 15 }, (_, i) => `job ${19 - i}`))
   await pane.unmount()
 })
 
@@ -564,7 +567,7 @@ test('token counter adds up every request', { options: { language: 'en' } }, asy
   })
   await $.session.start(start)
   let band = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect(await band.find({ type: 'Text', text: 'Tokens' })).toBeUndefined()
+  expect(await band.find({ type: 'Text', text: 'TOKENS' })).toBeUndefined()
   await band.unmount()
   for (let i = 0; i < 2; i++) {
     for await (const _chunk of $.turn.step({ turnId: 't', index: i, model: 'm', messageCount: 1 } as never)) {
@@ -573,7 +576,7 @@ test('token counter adds up every request', { options: { language: 'en' } }, asy
   }
   band = await $.ui.mount({ ...BAND, surface: 'desktop' })
   expect((await band.find({ type: 'Text', text: '200K' }))?.text).toBe('200K')
-  expect((await band.find({ type: 'Text', text: / cache / }))?.text).toBe(' cache 98%')
+  expect((await band.find({ type: 'Text', text: / cache$/ }))?.text).toBe('98% cache')
   await band.unmount()
 })
 
@@ -594,7 +597,7 @@ test('files Claude writes or edits are listed; failed or denied calls are not', 
   await call({ tool: 'Write', file_path: '/home/user/site/fail.txt', content: 'x' })
 
   let pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect((await pane.find({ type: 'Button', key: 'tab-outputs' }))?.props.label).toBe('Çıktılar (3)')
+  expect((await pane.find({ type: 'Button', key: 'tab-outputs' }))?.props.label).toBe('Çıktılar')
   // Overview's recent files: newest first
   const names = (await pane.findAll({ type: 'Text', text: /^ (index\.html|style\.css|report\.ipynb)$/ })).map(x => x.text)
   // (each name is its own mono Text inside the row)
@@ -714,16 +717,16 @@ test('a drawing before the language is known stays in one language, then switche
   stubEngine(on as AnyOn, w)
   // Before session.start: English throughout, numbers included
   let band = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect((await band.find({ type: 'Text', text: 'Context' }))?.text).toBe('Context')
+  expect((await band.find({ type: 'Text', text: 'CONTEXT' }))?.text).toBe('CONTEXT')
   expect((await band.find({ type: 'Text', text: /213K/ }))?.text).toBe('213K / 1 M')
-  expect(await band.find({ type: 'Text', text: /bin|Bağlam/ })).toBeUndefined()
+  expect(await band.find({ type: 'Text', text: /bin|BAĞLAM/ })).toBeUndefined()
   await band.unmount()
   // After it: Turkish throughout
   await $.session.start(start)
   band = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect((await band.find({ type: 'Text', text: 'Bağlam' }))?.text).toBe('Bağlam')
+  expect((await band.find({ type: 'Text', text: 'BAĞLAM' }))?.text).toBe('BAĞLAM')
   expect((await band.find({ type: 'Text', text: /213 bin/ }))?.text).toBe('213 bin / 1 M')
-  expect(await band.find({ type: 'Text', text: /213K|Context/ })).toBeUndefined()
+  expect(await band.find({ type: 'Text', text: /213K|CONTEXT/ })).toBeUndefined()
   await band.unmount()
   const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect((await pane.find({ type: 'Button', key: 'tab-overview' }))?.props.label).toBe('Genel')

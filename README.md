@@ -12,11 +12,12 @@ Built for the **Claude Code desktop app** (Code tab); it also draws in the termi
 
 **The strip (above the prompt)**
 
-- **Context:** ring gauge with tokens used out of the window
-- **5-hour and weekly limits:** ring gauges with time until reset
-- **Tokens:** session total and a cache / input / output mix bar
+- **Context:** how full it is, tokens used out of the window, and a thin meter
+- **5-hour and weekly limits:** how much is used, time until reset, and a meter that also shows (faint) where the window ends up at this pace
+- **Tokens:** session total, how much came from the cache, and the cache / input / output mix
 - **API cost:** what the session would cost at API prices, with a per-message sparkline
-- Rings turn **amber at 80%** and **red at 90%**
+- Every figure is one tile of the same shape; meters are a calm blue and turn **amber at 80%** and **red at 90%**
+- A footer names the model in use
 - **⚙ 2 jobs** appears while something runs in the background and opens that tab
 - **Details ↗** opens the panel, **Hide ▾** collapses the strip to a single "Show" line
 
@@ -27,10 +28,10 @@ Built for the **Claude Code desktop app** (Code tab); it also draws in the termi
   - *Context:* what fills it, where auto-compact starts, growth per message and how many messages are left before it compacts
   - *Cost:* cost per message with the average line, last hour, average and priciest message
   - *Session:* replies, average and longest reply time, tool calls and the most used tools
-  - *Background* and *Latest outputs*, side by side
+  - *Jobs* and *Latest outputs*, side by side
 - **Cost:** cost per message chart and the token breakdown (cache read, cache write, fresh input, output)
 - **Context:** every category that fills the context window
-- **Background:** running shell commands, subagents, monitors and workflows; recent subagents; scheduled tasks (cron, `/loop`)
+- **Jobs:** running shell commands, subagents, monitors and workflows; recent subagents; scheduled tasks (cron, `/loop`)
 - **Outputs:** files Claude wrote or edited this session, and finished background jobs with their status, summary, a subagent's report and the output file path
 - **Environment:** Remote Control status and toggle, folder (long names end in `...`, click for the full path), model, git, connected screens, version
 
@@ -71,7 +72,7 @@ The `language` option is `auto` by default: Turkish when your system locale star
 - **Dollar amounts are API-price equivalents.** On a Pro or Max subscription nothing extra is charged; the figure shows what the same usage would cost on the API.
 - **Counters start when the mod loads:** tokens, reply times and tool calls count every request from then on, subagents included. The cost-per-message chart counts only replies to your own messages.
 - **Forecasts are estimates.** Limit forecasts use your average pace since the window opened and wait until 5% of it has passed; context forecasts need a few replies. Both refresh after every reply.
-- **The Background list refreshes at the end of every reply**; subagents show live.
+- **The Jobs list refreshes at the end of every reply** (a job that ends leaves it at once); subagents show live.
 - **Remote Control toggle** runs Claude Code's own `/remote-control` command and shows its answer as a notification. That command only runs in a terminal session; in the desktop app the panel shows the connection status and points to the app's own setting instead.
 
 ## Privacy
@@ -111,9 +112,9 @@ Sohbetten çıkmadan oturumunun durumunu gör: bağlam doluluğu, kullanım limi
 
 - **Gizle ▾ / Göster ▴** düğmeleri şeridi daraltır ve açar (`/kullanim` komutu da aynı işi yapar).
 - **Ayrıntılar ↗** ya da `/kullanim-panel` paneli açar, Esc kapatır.
-- Halkalar %80'de sarıya, %90'da kırmızıya döner.
-- Arka planda iş çalışırken şeritte **⚙ 2 iş** düğmesi çıkar, tıklayınca Arka plan sekmesi açılır.
-- Panel sekmeleri: **Genel** (tahminler ve özet), **Maliyet**, **Bağlam**, **Arka plan**, **Çıktılar** (değişen dosyalar ve biten işler), **Ortam**.
+- Her ölçü aynı biçimde bir kart: büyük rakam, açıklaması ve ince bir çubuk. Çubuklar normalde mavidir, %80'de sarıya, %90'da kırmızıya döner. Limit çubuğu, bu hızla sıfırlanmaya kadar varılacak yeri soluk renkle gösterir.
+- Arka planda iş çalışırken şeritte **⚙ 2 iş** düğmesi çıkar, tıklayınca İşler sekmesi açılır.
+- Panel sekmeleri: **Genel** (tahminler ve özet), **Maliyet**, **Bağlam**, **İşler**, **Çıktılar** (değişen dosyalar ve biten işler), **Ortam**.
 
 **Dil:** Varsayılan `auto`. Sistem dilin `tr` ile başlıyorsa Türkçe, değilse İngilizce. Kurulumdaki ayar ekranında `tr` ya da `en` seçebilir, sonradan terminalde `/config` ile değiştirebilirsin.
 

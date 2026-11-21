@@ -76,19 +76,25 @@ const TABS: StripTab[] = ['overview', 'cost', 'context', 'background', 'outputs'
 // ---------- Sizes and colours ----------
 // SVGs use saturated colours on a translucent track so they read on light and
 // dark themes; all other text uses the app's own theme colours.
-const RING = 58
-const RING_STROKE = 7
-const STACK_W = 170
-const STACK_H = 8
-const SPARK_W = 130
-const SPARK_H = 26
+// The strip's tiles: one width for every bar and sparkline in them.
+const TILE_W = 104
+const METER_H = 6
+const SPARK_W = 56
+const SPARK_H = 20
 const PANEL_W = 600
 const FOLDER_MAX = 24
+// Card outlines: the theme's own grey, clearer than a dimmed border.
+const EDGE: Color = 'inactive'
 const TRACK = 'rgba(127,127,127,0.22)'
+// Past bars in a chart: quiet, so the newest (in colour) stands out.
+const PAST = 'rgba(150,150,150,0.55)'
 const MUTED = '#8b949e'
 // A full, rounded face first where it is installed, then the system's.
 const FONT = 'Inter,SF Pro Display,-apple-system,system-ui,Segoe UI,Roboto,Ubuntu,Cantarell,sans-serif'
 
+// A figure in its normal range is drawn in a calm accent; amber and red
+// are kept for the levels that need attention.
+const ACCENT = '#6ea8fe'
 const COLOR = {
   ok: '#3fb950',
   warn: '#e3a008',
@@ -117,6 +123,11 @@ function level(percent: number): Level {
   if (percent >= 90) return 'crit'
   if (percent >= 80) return 'warn'
   return 'ok'
+}
+
+function levelColor(percent: number): string {
+  const l = level(percent)
+  return l === 'ok' ? ACCENT : COLOR[l]
 }
 
 const ACTIVE = new Set(['pending', 'running', 'waiting'])
@@ -307,26 +318,21 @@ export function contextForecast(log: readonly number[], current: number, thresho
 }
 
 // ---------- Drawings ----------
-function ringSvg(percent: number | undefined, lang: Lang, size = RING, stroke = RING_STROKE): string {
-  const r = (size - stroke) / 2
-  const c = size / 2
-  const len = 2 * Math.PI * r
+// A thin meter: the share used, and (faint) where it ends up at this pace.
+function meterSvg(percent: number | undefined, projected: number | null = null, w = TILE_W, ht = METER_H): string {
   const p = percent === undefined ? 0 : Math.max(0, Math.min(100, percent))
-  const color = percent === undefined ? COLOR.none : COLOR[level(p)]
-  const dash = (p / 100) * len
-  const label = percent === undefined ? '—' : fmtPct(Math.round(p), lang)
-  return svg(
-    size,
-    size,
-    `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${TRACK}" stroke-width="${stroke}"/>` +
-      (dash > 0
-        ? `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${dash.toFixed(2)} ${len.toFixed(2)}" transform="rotate(-90 ${c} ${c})"/>`
-        : '') +
-      `<text x="${c}" y="${c}" text-anchor="middle" dominant-baseline="central" font-family="${FONT}" font-size="${Math.round(size / 3.6)}" font-weight="800" fill="${color}">${esc(label)}</text>`,
-  )
+  const x = (v: number) => (Math.max(0, Math.min(100, v)) / 100) * w
+  let body = `<rect width="${w}" height="${ht}" rx="${ht / 2}" fill="${TRACK}"/>`
+  if (projected !== null && projected > p) {
+    body += `<rect width="${x(projected).toFixed(2)}" height="${ht}" rx="${ht / 2}" fill="${levelColor(projected)}" fill-opacity="0.3"/>`
+  }
+  if (percent !== undefined && p > 0) {
+    body += `<rect width="${Math.max(ht, x(p)).toFixed(2)}" height="${ht}" rx="${ht / 2}" fill="${levelColor(p)}"/>`
+  }
+  return svg(w, ht, body)
 }
 
-function stackSvg(parts: { value: number; color: string; opacity?: number }[], w = STACK_W, ht = STACK_H, whole?: number): string {
+function stackSvg(parts: { value: number; color: string; opacity?: number }[], w = TILE_W, ht = METER_H, whole?: number): string {
   const total = whole ?? parts.reduce((a, p) => a + p.value, 0)
   let x = 0
   let body = `<rect width="${w}" height="${ht}" rx="${ht / 2}" fill="${TRACK}"/>`
@@ -346,14 +352,14 @@ function stackSvg(parts: { value: number; color: string; opacity?: number }[], w
 function sparkSvg(values: number[]): string {
   const n = Math.max(values.length, 1)
   const slot = SPARK_W / Math.max(n, 12)
-  const barW = Math.max(2, slot - 2)
+  const barW = Math.max(2, slot - 1.5)
   const max = Math.max(...values, 0.0001)
   const start = SPARK_W - n * slot
-  let body = `<line x1="0" y1="${SPARK_H - 0.5}" x2="${SPARK_W}" y2="${SPARK_H - 0.5}" stroke="${TRACK}" stroke-width="1"/>`
+  let body = ''
   values.forEach((v, i) => {
-    const bh = Math.max(2, (v / max) * (SPARK_H - 2))
+    const bh = Math.max(2, (v / max) * SPARK_H)
     const isLast = i === values.length - 1
-    body += `<rect x="${(start + i * slot + 1).toFixed(2)}" y="${(SPARK_H - 1 - bh).toFixed(2)}" width="${barW.toFixed(2)}" height="${bh.toFixed(2)}" rx="1.5" fill="${COLOR.cost}" fill-opacity="${isLast ? 1 : 0.45}"/>`
+    body += `<rect x="${(start + i * slot + 1).toFixed(2)}" y="${(SPARK_H - bh).toFixed(2)}" width="${barW.toFixed(2)}" height="${bh.toFixed(2)}" rx="1.5" fill="${isLast ? COLOR.cost : PAST}"/>`
   })
   return svg(SPARK_W, SPARK_H, body)
 }
@@ -393,7 +399,7 @@ function costMiniSvg(values: number[]): string {
     const bh = Math.max(2, (v / max) * plot)
     const isLast = i === values.length - 1
     const x = i * slot + (slot - barW) / 2
-    body += `<rect x="${x.toFixed(1)}" y="${(H - 1 - bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="3" fill="${COLOR.cost}" fill-opacity="${isLast ? 1 : 0.5}"/>`
+    body += `<rect x="${x.toFixed(1)}" y="${(H - 1 - bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="3" fill="${isLast ? COLOR.cost : PAST}"/>`
   })
   const ay = H - 1 - (avg / max) * plot
   body += `<line x1="0" y1="${ay.toFixed(1)}" x2="${W}" y2="${ay.toFixed(1)}" stroke="${COLOR.cost}" stroke-width="1.5" stroke-dasharray="6 5" opacity="0.8"/>`
@@ -405,7 +411,7 @@ function forecastBarSvg(percent: number, projected: number | null, verdict: Limi
   const W = PANEL_W
   const H = 10
   const scale = Math.max(100, Math.min(projected ?? 0, 150))
-  const color = verdict === 'over' ? COLOR.crit : verdict === 'tight' ? COLOR.warn : COLOR.ok
+  const color = verdict === 'over' ? COLOR.crit : verdict === 'tight' ? COLOR.warn : ACCENT
   const x = (p: number) => (Math.max(0, Math.min(p, scale)) / scale) * W
   let body = `<rect width="${W}" height="${H}" rx="${H / 2}" fill="${TRACK}"/>`
   if (projected !== null && projected > percent) {
@@ -440,7 +446,7 @@ function costChartSvg(values: number[], lang: Lang): string {
     const x = left + i * slot + (slot - barW) / 2
     const y = top + plotH - bh
     const isLast = i === values.length - 1
-    body += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="3" fill="${COLOR.cost}" fill-opacity="${isLast ? 1 : 0.5}"/>`
+    body += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="3" fill="${isLast ? COLOR.cost : PAST}"/>`
     if (isLast || i === maxIdx) {
       body += `<text x="${(x + barW / 2).toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700" fill="${COLOR.cost}">${esc(fmtUsd(v, lang))}</text>`
     }
@@ -682,164 +688,153 @@ export const register: Register = (on, options) => {
     const history = await read($, costHistory)
     const bg = await read($, bgAtom)
     const agents = await $.agent.list()
+    const model = await $.session.model()
     const running = runningJobs(bg, agents).length
     const below = await next(e)
+    const upper = (text: string) => text.toLocaleUpperCase(lang === 'tr' ? 'tr' : 'en')
+    // A figure is coloured only when it needs attention; the terminal, with no
+    // meter beside it, colours it always.
+    const figureColor = (percent: number): Color | undefined =>
+      e.surface === 'terminal' || level(percent) !== 'ok' ? TEXT_COLOR[level(percent)] : undefined
 
-    // Rings: context + plan limits
-    const ctx = usage.context
-    const ctxMeasured = ctx.tokens !== undefined && ctx.percent !== undefined
-    const rings = [
-      {
-        key: 'context',
-        label: M.context,
-        percent: ctxMeasured ? ctx.percent : undefined,
-        detail: ctxMeasured ? `${fmtTokens(ctx.tokens ?? 0, lang)} / ${fmtTokens(ctx.window, lang)}` : M.notMeasured,
-      },
-      ...(usage.rateLimits.slice(0, 3) as SessionRateLimit[]).map(r => ({
-        key: r.kind,
-        label: limitName(r.kind, M),
-        percent: r.percentUsed as number | undefined,
-        detail: resetText(r.resetsAt, now, lang),
-      })),
-    ]
-
-    const card = (key: string, children: RenderChildren[], center = false) => (
-      <Box
-        key={key}
-        flexDirection="column"
-        flexGrow={1}
-        alignItems={center ? 'center' : 'stretch'}
-        justifyContent="center"
-        borderStyle="round"
-        borderDimColor
-        paddingX={1}
-      >
-        {children}
+    // Every tile alike: a small label, the figure large (a sparkline may sit
+    // beside it), its detail, then a thin meter. Narrow enough for five a row.
+    const tile = (
+      key: string,
+      label: string,
+      value: string,
+      detail: string,
+      meterNode: RenderChildren,
+      valueColor?: Color,
+      aside?: RenderChildren,
+    ) => (
+      <Box key={key} flexDirection="column" flexGrow={1} rowGap="xs" borderStyle="round" borderColor={EDGE} paddingX={1} paddingY="xs">
+        <Text size="footnote" weight="bold" color={MUTED}>
+          {upper(label)}
+        </Text>
+        <Box flexDirection="row" alignItems="flex-end" columnGap={1}>
+          <Text size="title" weight="bold" tabular color={valueColor}>
+            {value}
+          </Text>
+          {aside ?? null}
+        </Box>
+        {detail ? (
+          <Text size="footnote" tabular color={MUTED}>
+            {detail}
+          </Text>
+        ) : null}
+        {meterNode}
       </Box>
     )
+    const meter = (alt: string, percent: number | undefined, projected: number | null = null) =>
+      Svg ? (
+        <Svg key="m" source={meterSvg(percent, projected)} alt={alt} width={TILE_W} height={METER_H} />
+      ) : (
+        <Text key="m" color={percent === undefined ? undefined : TEXT_COLOR[level(percent)]}>
+          {barText(percent ?? 0, 12)}
+        </Text>
+      )
 
-    const ringCards = rings.map(g =>
-      card(
-        g.key,
-        [
-          Svg ? (
-            <Svg
-              key="g"
-              source={ringSvg(g.percent, lang)}
-              alt={`${g.label} ${g.percent === undefined ? M.notMeasured : fmtPct(Math.round(g.percent), lang)}`}
-              width={RING}
-              height={RING}
-            />
-          ) : (
-            <Text key="g" bold color={g.percent === undefined ? undefined : TEXT_COLOR[level(g.percent)]}>
-              {g.percent === undefined ? '—' : `${barText(g.percent)} ${fmtPct(Math.round(g.percent), lang)}`}
-            </Text>
-          ),
-          <Text key="l" size="footnote" weight="bold">
-            {g.label}
-          </Text>,
-          g.detail ? (
-            <Text key="d" size="footnote" tabular>
-              {g.detail}
-            </Text>
-          ) : null,
-        ],
-        true,
+    // Context
+    const ctx = usage.context
+    const ctxMeasured = ctx.tokens !== undefined && ctx.percent !== undefined
+    const tiles: RenderChildren[] = [
+      tile(
+        'context',
+        M.context,
+        ctxMeasured ? fmtPct(Math.round(ctx.percent ?? 0), lang) : '—',
+        ctxMeasured ? `${fmtTokens(ctx.tokens ?? 0, lang)} / ${fmtTokens(ctx.window, lang)}` : M.notMeasured,
+        meter(`${M.context} ${ctxMeasured ? fmtPct(Math.round(ctx.percent ?? 0), lang) : M.notMeasured}`, ctxMeasured ? ctx.percent : undefined),
+        ctxMeasured ? figureColor(ctx.percent ?? 0) : undefined,
       ),
-    )
+    ]
 
-    // Tokens card: total + mix bar + legend
+    // Plan limits, each with where it ends up at its reset at this pace (faint)
+    for (const r of usage.rateLimits.slice(0, 3) as SessionRateLimit[]) {
+      const fc = limitForecast(r.percentUsed, r.resetsAt, r.kind, now)
+      const name = limitName(r.kind, M)
+      tiles.push(
+        tile(
+          r.kind,
+          name,
+          fmtPct(Math.round(r.percentUsed), lang),
+          resetText(r.resetsAt, now, lang),
+          meter(`${name} ${fmtPct(Math.round(r.percentUsed), lang)}`, r.percentUsed, fc.projected),
+          figureColor(r.percentUsed),
+        ),
+      )
+    }
+
+    // Tokens: the total, how much came from the cache, the mix as one bar
     const fresh = t.input + t.cacheWrite
     const total = t.cacheRead + fresh + t.output
-    const parts = [
-      { name: M.cache, value: t.cacheRead, color: COLOR.cacheRead },
-      { name: M.input, value: fresh, color: COLOR.input },
-      { name: M.output, value: t.output, color: COLOR.output },
-    ]
-    const tokenCard =
-      t.requests > 0
-        ? card('tokens', [
-            <Box key="t" flexDirection="row" justifyContent="space-between" alignItems="center" columnGap={2}>
-              <Text size="footnote" weight="bold">
-                {M.tokens}
-              </Text>
-              <Text size="title" weight="bold" tabular>
-                {fmtTokens(total, lang)}
-              </Text>
-            </Box>,
-            Svg ? <Svg key="s" source={stackSvg(parts)} alt={M.altTokenMix} width={STACK_W} height={STACK_H} /> : null,
-            <Box key="lg" flexDirection="row" columnGap={1}>
-              {parts.map(p => (
-                <Box key={p.name} flexDirection="row">
-                  <Text size="footnote" color={p.color}>
-                    ●
-                  </Text>
-                  <Text size="footnote" tabular>
-                    {` ${p.name} ${fmtShare(p.value, total, lang)}`}
-                  </Text>
-                </Box>
-              ))}
-            </Box>,
-          ])
-        : null
+    if (t.requests > 0) {
+      const parts = [
+        { value: t.cacheRead, color: COLOR.cacheRead },
+        { value: fresh, color: COLOR.input },
+        { value: t.output, color: COLOR.output },
+      ]
+      tiles.push(
+        tile(
+          'tokens',
+          M.tokens,
+          fmtTokens(total, lang),
+          `${fmtShare(t.cacheRead, total, lang)} ${M.cache}`,
+          Svg ? <Svg key="m" source={stackSvg(parts)} alt={M.altTokenMix} width={TILE_W} height={METER_H} /> : null,
+        ),
+      )
+    }
 
-    // Cost card: total + per-message sparkline
+    // Cost at API prices, with each message's cost as a sparkline
     const last = history.length > 0 ? history[history.length - 1] : undefined
-    const costCard = usage.cost
-      ? card('cost', [
-          <Box key="t" flexDirection="row" justifyContent="space-between" alignItems="center" columnGap={2}>
-            <Text size="footnote" weight="bold">
-              {M.apiCost}
-            </Text>
-            <Text size="title" weight="bold" tabular color={COLOR.cost}>
-              {fmtUsd(usage.cost.usd, lang)}
-            </Text>
-          </Box>,
+    if (usage.cost) {
+      tiles.push(
+        tile(
+          'cost',
+          M.apiCost,
+          fmtUsd(usage.cost.usd, lang),
+          last === undefined ? M.sessionTotal : `${M.lastMessage} ${fmtUsd(last, lang)}`,
+          null,
+          COLOR.cost,
           Svg && history.length > 0 ? (
-            <Svg key="s" source={sparkSvg(history)} alt={M.costPerMessage} width={SPARK_W} height={SPARK_H} />
+            <Svg key="spark" source={sparkSvg(history)} alt={M.costPerMessage} width={SPARK_W} height={SPARK_H} />
           ) : null,
-          <Text key="d" size="footnote" tabular>
-            {last === undefined ? M.sessionTotal : `${M.lastMessage} ${fmtUsd(last, lang)}`}
-          </Text>,
-        ])
-      : null
+        ),
+      )
+    }
 
-    // Buttons side by side, Hide always at the far right. The jobs button
-    // shows only while something runs in the background.
+    // A footer: the model and what runs in the background on the left, the
+    // strip's own buttons on the right.
     const openTab = (tab: StripTab) => {
       void update($, tabAtom, () => tab)
       void $.ui.open({ id: PANE_ID, title: M.paneTitle, focus: true, closeOnEscape: true })
     }
-    const jobsButton =
-      running > 0 ? (
-        <Box key="jobs-box" flexDirection="column" justifyContent="center">
-          <Button key="jobs" label={M.bgButton(running)} plain onPress={() => openTab('background')} />
+    const footer = (
+      <Box key="footer" flexDirection="row" justifyContent="space-between" alignItems="center" columnGap={1}>
+        <Box flexDirection="row" alignItems="center" columnGap={1}>
+          <Text size="footnote" color={MUTED}>
+            {modelName(model, M)}
+          </Text>
+          {running > 0 ? <Button key="jobs" label={M.bgButton(running)} plain onPress={() => openTab('background')} /> : null}
         </Box>
-      ) : null
-    const detailsButton = (
-      <Box key="details" flexDirection="column" justifyContent="center">
-        <Button
-          key="details-btn"
-          label={M.details}
-          plain
-          onPress={() => void $.ui.open({ id: PANE_ID, title: M.paneTitle, focus: true, closeOnEscape: true })}
-        />
-      </Box>
-    )
-    const hideButton = (
-      <Box key="hide-box" flexDirection="column" justifyContent="center">
-        <Button key="hide" label={M.hide} plain onPress={() => void update($, isHidden, () => true)} />
+        <Box flexDirection="row" alignItems="center" columnGap={1}>
+          <Button
+            key="details-btn"
+            label={M.details}
+            plain
+            onPress={() => void $.ui.open({ id: PANE_ID, title: M.paneTitle, focus: true, closeOnEscape: true })}
+          />
+          <Button key="hide" label={M.hide} plain onPress={() => void update($, isHidden, () => true)} />
+        </Box>
       </Box>
     )
 
     const strip = (
-      <Box flexDirection="row" flexWrap="wrap" columnGap={1} rowGap={1} alignItems="stretch">
-        {ringCards}
-        {tokenCard}
-        {costCard}
-        {jobsButton}
-        {detailsButton}
-        {hideButton}
+      <Box flexDirection="column" rowGap={1}>
+        <Box key="tiles" flexDirection="row" flexWrap="wrap" columnGap={1} rowGap={1} alignItems="stretch">
+          {tiles}
+        </Box>
+        {footer}
       </Box>
     )
 
@@ -887,12 +882,14 @@ export const register: Register = (on, options) => {
     const goTo = (target: StripTab) => () => void update($, tabAtom, () => target)
 
     // --- Tab bar ---
-    const counts: Partial<Record<StripTab, number>> = { background: jobs.length, outputs: outputs.length + files.length }
+    // Only what runs now is counted on a tab, so six tabs fit one row; a
+    // narrow panel scrolls the row rather than wrapping it.
+    const counts: Partial<Record<StripTab, number>> = { background: jobs.length }
     const tabBar = (
-      <Box key="tabs" flexDirection="row" flexWrap="wrap" columnGap={1} rowGap={1}>
+      <Box key="tabs" flexDirection="row" flexWrap="nowrap" overflowX="scroll">
         {TABS.map(id => {
           const n = counts[id]
-          const label = (M.tabs[id] ?? id) + (n ? ` (${n})` : '')
+          const label = (M.tabs[id] ?? id) + (n ? ` · ${n}` : '')
           return id === tab ? (
             <Button key={'tab-' + id} label={label} variant="primary" onPress={goTo(id)} />
           ) : (
@@ -908,7 +905,7 @@ export const register: Register = (on, options) => {
       // A one-screen dashboard of what the strip does not show. Every block is
       // the same card: a small heading, a figure on its right, a "→" to its tab.
       const card = (key: string, title: string, target: StripTab | null, right: string, body: RenderChildren[], grow = false) => (
-        <Box key={key} flexDirection="column" flexGrow={grow ? 1 : 0} width={grow ? '48%' : undefined} borderStyle="round" borderDimColor paddingX={1}>
+        <Box key={key} flexDirection="column" flexGrow={grow ? 1 : 0} width={grow ? '48%' : undefined} rowGap="xs" borderStyle="round" borderColor={EDGE} paddingX={1} paddingY="xs">
           <Box flexDirection="row" justifyContent="space-between" alignItems="center" columnGap={1}>
             <Text size="footnote" weight="bold" color={MUTED}>
               {title.toLocaleUpperCase(lang === 'tr' ? 'tr' : 'en')}
@@ -919,7 +916,7 @@ export const register: Register = (on, options) => {
                   {right}
                 </Text>
               ) : null}
-              {target ? <Button key={'go-' + target} label="→" plain onPress={goTo(target)} /> : null}
+              {target ? <Button key={'go-' + target} label={M.open} plain onPress={goTo(target)} /> : null}
             </Box>
           </Box>
           {body}
@@ -932,7 +929,48 @@ export const register: Register = (on, options) => {
         </Box>
       )
 
-      // 1. Limits: where each window ends up by its reset at this pace
+      // 1. Session: four figures in one row, then the most used tools
+      const topTools = Object.entries(toolStats.counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+      const stat = (key: string, label: string, value: string, color?: Color) => (
+        <Box key={key} flexDirection="column" flexGrow={1}>
+          <Text size="footnote" color={MUTED}>
+            {label}
+          </Text>
+          <Text size="heading" weight="bold" tabular color={color}>
+            {value}
+          </Text>
+        </Box>
+      )
+      sections.push(
+        card('session', M.sessionStats, null, toolStats.errors > 0 ? M.errorsN(toolStats.errors) : '', [
+          <Box key="stats" flexDirection="row" columnGap={2}>
+            {stat('replies', M.replies, String(turnStats.count))}
+            {stat('avg-reply', M.avgReply, turnStats.count > 0 ? fmtRunTime(turnStats.totalMs / turnStats.count, lang) : '—')}
+            {stat('max-reply', M.longestReply, turnStats.count > 0 ? fmtRunTime(turnStats.maxMs, lang) : '—')}
+            {stat('tools', M.toolCalls, String(toolStats.total))}
+          </Box>,
+          topTools.length === 0 ? (
+            <Text key="tools-none" size="footnote" color={MUTED}>
+              {M.noTools}
+            </Text>
+          ) : (
+            <Box key="tools-top" flexDirection="row" flexWrap="wrap" columnGap={2} rowGap="xs">
+              {topTools.map(([name, n], i) => (
+                <Box key={'tool-' + name} flexDirection="row">
+                  <Text size="footnote" color={CATEGORY_COLORS[i % CATEGORY_COLORS.length]}>
+                    ●
+                  </Text>
+                  <Text size="footnote" tabular>{` ${toolLabel(name)} ${n}`}</Text>
+                </Box>
+              ))}
+            </Box>
+          ),
+        ]),
+      )
+
+      // 2. Limits: where each window ends up by its reset at this pace
       const limits = (usage.rateLimits as SessionRateLimit[]).filter(r => WINDOW_MS[r.kind] !== undefined)
       if (limits.length > 0) {
         sections.push(
@@ -960,7 +998,7 @@ export const register: Register = (on, options) => {
               const verdictColor: Color | undefined =
                 fc.verdict === 'over' ? 'error' : fc.verdict === 'tight' ? 'warning' : fc.verdict === 'safe' ? 'success' : undefined
               return (
-                <Box key={'fc-' + r.kind} flexDirection="column">
+                <Box key={'fc-' + r.kind} flexDirection="column" rowGap="xs" marginTop={1}>
                   {line(
                     'l1',
                     <Text weight="bold">{name}</Text>,
@@ -989,7 +1027,7 @@ export const register: Register = (on, options) => {
         )
       }
 
-      // 2. Context: what fills it, where auto-compact starts, and how soon
+      // 3. Context: what fills it, where auto-compact starts, and how soon
       const bd = usage.context.breakdown
       const ctxNow = usage.context.tokens
       if (bd && ctxNow !== undefined) {
@@ -1015,7 +1053,7 @@ export const register: Register = (on, options) => {
               ) : (
                 <Text key="bar">{barText((ctxNow / bd.rawMaxTokens) * 100, 20)}</Text>
               ),
-              <Box key="legend" flexDirection="row" flexWrap="wrap" columnGap={2}>
+              <Box key="legend" flexDirection="row" flexWrap="wrap" columnGap={2} rowGap="xs">
                 {used.slice(0, 4).map(s => (
                   <Box key={'cl-' + s.name} flexDirection="row">
                     <Text size="footnote" color={s.color}>
@@ -1033,7 +1071,7 @@ export const register: Register = (on, options) => {
         )
       }
 
-      // 3. Cost: per-message bars with the average line, and the key figures
+      // 4. Cost: per-message bars with the average line, and the key figures
       const hourAgo = now - 3_600_000
       const lastHour = costLog.filter(c => c.at >= hourAgo).reduce((a, c) => a + c.usd, 0)
       const priciest = history.length > 0 ? Math.max(...history) : 0
@@ -1075,47 +1113,6 @@ export const register: Register = (on, options) => {
           ]),
         )
       }
-
-      // 4. Session: four figures in one row, then the most used tools
-      const topTools = Object.entries(toolStats.counts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-      const stat = (key: string, label: string, value: string, color?: Color) => (
-        <Box key={key} flexDirection="column" flexGrow={1}>
-          <Text size="footnote" color={MUTED}>
-            {label}
-          </Text>
-          <Text size="heading" weight="bold" tabular color={color}>
-            {value}
-          </Text>
-        </Box>
-      )
-      sections.push(
-        card('session', M.sessionStats, null, toolStats.errors > 0 ? M.errorsN(toolStats.errors) : '', [
-          <Box key="stats" flexDirection="row" columnGap={2}>
-            {stat('replies', M.replies, String(turnStats.count))}
-            {stat('avg-reply', M.avgReply, turnStats.count > 0 ? fmtRunTime(turnStats.totalMs / turnStats.count, lang) : '—')}
-            {stat('max-reply', M.longestReply, turnStats.count > 0 ? fmtRunTime(turnStats.maxMs, lang) : '—')}
-            {stat('tools', M.toolCalls, String(toolStats.total))}
-          </Box>,
-          topTools.length === 0 ? (
-            <Text key="tools-none" size="footnote" color={MUTED}>
-              {M.noTools}
-            </Text>
-          ) : (
-            <Box key="tools-top" flexDirection="row" flexWrap="wrap" columnGap={2}>
-              {topTools.map(([name, n], i) => (
-                <Box key={'tool-' + name} flexDirection="row">
-                  <Text size="footnote" color={CATEGORY_COLORS[i % CATEGORY_COLORS.length]}>
-                    ●
-                  </Text>
-                  <Text size="footnote" tabular>{` ${toolLabel(name)} ${n}`}</Text>
-                </Box>
-              ))}
-            </Box>
-          ),
-        ]),
-      )
 
       // 5. Background and latest outputs, side by side
       const glance = [jobs.length > 0 ? M.bgRunningCount(jobs.length) : '', bg.crons.length > 0 ? M.bgScheduledCount(bg.crons.length) : '']
@@ -1253,7 +1250,7 @@ export const register: Register = (on, options) => {
           <Box key="context" flexDirection="column" rowGap={1}>
             {heading(
               M.contextWhat,
-              <Text tabular weight="bold" color={TEXT_COLOR[level(bd.percentage)]}>
+              <Text tabular weight="bold" color={level(bd.percentage) === 'ok' ? undefined : TEXT_COLOR[level(bd.percentage)]}>
                 {`${fmtPct(Math.round(bd.percentage), lang)} · ${fmtTokens(bd.totalTokens, lang)} / ${fmtTokens(bd.rawMaxTokens, lang)}`}
               </Text>,
             )}
@@ -1268,7 +1265,7 @@ export const register: Register = (on, options) => {
                 alt={M.altContext}
               />
             ) : null}
-            <Box flexDirection="column">
+            <Box flexDirection="column" rowGap="xs">
               {rows.map(s => (
                 <Box key={s.key} flexDirection="row" justifyContent="space-between" columnGap={2}>
                   <Box flexDirection="row">
@@ -1293,7 +1290,7 @@ export const register: Register = (on, options) => {
 
     if (tab === 'background') {
       const jobRow = (j: Job) => (
-        <Box key={j.key} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+        <Box key={j.key} flexDirection="column" rowGap="xs" borderStyle="round" borderColor={EDGE} paddingX={1} paddingY="xs">
           <Box flexDirection="row" justifyContent="space-between" columnGap={2}>
             <Box flexDirection="row">
               <Text color={TASK_COLORS[j.type] ?? MUTED}>●</Text>
@@ -1339,7 +1336,7 @@ export const register: Register = (on, options) => {
             <Text>{M.bgNoScheduled}</Text>
           ) : (
             bg.crons.map(c => (
-              <Box key={'c-' + c.id} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+              <Box key={'c-' + c.id} flexDirection="column" rowGap="xs" borderStyle="round" borderColor={EDGE} paddingX={1} paddingY="xs">
                 <Box flexDirection="row" justifyContent="space-between" columnGap={2}>
                   <Text mono weight="bold">
                     {c.schedule}
@@ -1368,7 +1365,7 @@ export const register: Register = (on, options) => {
           {fileList.length === 0 ? (
             <Text>{M.noFiles}</Text>
           ) : (
-            <Box flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+            <Box flexDirection="column" rowGap="xs" borderStyle="round" borderColor={EDGE} paddingX={1} paddingY="xs">
               {fileList.slice(0, 12).map(f => (
                 <Box key={'f-' + f.path} flexDirection="row" justifyContent="space-between" columnGap={2}>
                   <Box flexDirection="row">
@@ -1400,7 +1397,7 @@ export const register: Register = (on, options) => {
             <Text>{M.noOutputs}</Text>
           ) : (
             list.map(o => (
-              <Box key={'o-' + o.id} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+              <Box key={'o-' + o.id} flexDirection="column" rowGap="xs" borderStyle="round" borderColor={EDGE} paddingX={1} paddingY="xs">
                 <Box flexDirection="row" justifyContent="space-between" columnGap={2}>
                   <Box flexDirection="row">
                     <Text color={statusColor(o.status)}>{statusIcon(o.status)}</Text>
@@ -1475,7 +1472,7 @@ export const register: Register = (on, options) => {
       sections.push(
         <Box key="env" flexDirection="column" rowGap={1}>
           {heading(M.environment)}
-          <Box flexDirection="column" rowGap={1} borderStyle="round" borderDimColor paddingX={1}>
+          <Box flexDirection="column" rowGap={1} borderStyle="round" borderColor={EDGE} paddingX={1} paddingY="xs">
             {row('rc', M.remote, phoneOn ? M.phoneOn : M.phoneOff, undefined, phoneOn ? 'success' : undefined)}
             <Box key="rc-btn" flexDirection="row" justifyContent="flex-end">
               {canToggleRemote ? (
@@ -1502,7 +1499,7 @@ export const register: Register = (on, options) => {
     }
 
     return (
-      <Box flexDirection="column" rowGap={2} paddingX={1} paddingY={1}>
+      <Box flexDirection="column" rowGap={2} paddingY={1}>
         {tabBar}
         {sections}
       </Box>
