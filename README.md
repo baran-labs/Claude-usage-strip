@@ -1,5 +1,7 @@
 # Usage Strip for Claude Code
 
+[Türkçe açıklama aşağıda](#türkçe)
+
 See where your session stands without leaving the chat: context fill, plan limits, tokens used and what the session would cost at API prices, drawn as clean visual cards right above the prompt. One click opens a tabbed panel beside the conversation whose first page is a one-screen dashboard: where your limits and context are heading, cost per message, session stats, background jobs and the latest outputs.
 
 Built for the **Claude Code desktop app** (Code tab); it also draws in the terminal (with text bars), VS Code and mobile. **English and Turkish** built in.
@@ -7,6 +9,8 @@ Built for the **Claude Code desktop app** (Code tab); it also draws in the termi
 ![Usage strip above the prompt](screenshots/strip-en.png)
 
 <img src="screenshots/panel-en.png" alt="Detailed usage panel" width="560">
+
+<sub>Pictures drawn with sample data.</sub>
 
 ## What it shows
 
@@ -24,10 +28,10 @@ Built for the **Claude Code desktop app** (Code tab); it also draws in the termi
 **The panel (beside the chat), in tabs**
 
 - **Overview:** one screen, no scrolling, nothing the strip already shows:
+  - *Session:* replies, average and longest reply time, tool calls and the most used tools
   - *Limit forecast:* at your pace so far, where each window ends up by its reset ("51% → ~73% at reset"), with a verdict: plenty of room, getting close, or "runs out in ~1h 5m"
   - *Context:* what fills it, where auto-compact starts, growth per message and how many messages are left before it compacts
   - *Cost:* cost per message with the average line, last hour, average and priciest message
-  - *Session:* replies, average and longest reply time, tool calls and the most used tools
   - *Jobs* and *Latest outputs*, side by side
 - **Cost:** cost per message chart and the token breakdown (cache read, cache write, fresh input, output)
 - **Context:** every category that fills the context window
@@ -105,6 +109,8 @@ Sohbetten çıkmadan oturumunun durumunu gör: bağlam doluluğu, kullanım limi
 ![Mesaj kutusunun üstündeki kullanım şeridi](screenshots/strip-tr.png)
 
 <img src="screenshots/panel-tr.png" alt="Ayrıntılı kullanım paneli" width="560">
+
+<sub>Görseller örnek rakamlarla çizildi.</sub>
 
 **Kurulum:** Yukarıdaki *Install* bölümündeki komutları kullan. Masaüstü uygulamasında: mesaj kutusunun yanındaki **+**, sonra **Plugins**, **Add marketplace** ile `baran-labs/claude-usage-strip`, sonra **Add plugin**.
 
