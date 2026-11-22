@@ -6,7 +6,7 @@ Built for the **Claude Code desktop app** (Code tab); it also draws in the termi
 
 ![Usage strip above the prompt](screenshots/strip-en.png)
 
-![Detailed usage panel](screenshots/panel-en.png)
+<img src="screenshots/panel-en.png" alt="Detailed usage panel" width="560">
 
 ## What it shows
 
@@ -104,7 +104,7 @@ Sohbetten çıkmadan oturumunun durumunu gör: bağlam doluluğu, kullanım limi
 
 ![Mesaj kutusunun üstündeki kullanım şeridi](screenshots/strip-tr.png)
 
-![Ayrıntılı kullanım paneli](screenshots/panel-tr.png)
+<img src="screenshots/panel-tr.png" alt="Ayrıntılı kullanım paneli" width="560">
 
 **Kurulum:** Yukarıdaki *Install* bölümündeki komutları kullan. Masaüstü uygulamasında: mesaj kutusunun yanındaki **+**, sonra **Plugins**, **Add marketplace** ile `baran-labs/claude-usage-strip`, sonra **Add plugin**.
 
